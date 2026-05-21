@@ -1,27 +1,37 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Events;
 
-public class BotonFisicoDebug : MonoBehaviour
+public class BotonFisicoInteractivo : MonoBehaviour
 {
     #region Referencias
     [Header("Referencias")]
     public Transform botonVisual;
+    public Light luzFeedback;
     #endregion
 
     #region Configuracion
     [Header("Configuracion")]
     public string mensajeDebug = "Boton fisico pulsado";
+    public string tagActivador = "Hand";
+
     public Vector3 direccionPresionado = new Vector3(0f, -0.03f, 0f);
     public float duracionPresionado = 0.08f;
     public float tiempoAntesDeRegresar = 0.12f;
-    public bool permitirRepetir = true;
     public float tiempoEntrePulsaciones = 0.5f;
+
+    [Header("Feedback luz")]
+    public bool apagarLuzAlIniciar = true;
+    public float tiempoLuzEncendida = 0.25f;
+
+    [Header("Eventos")]
+    public UnityEvent alPulsar;
     #endregion
 
     #region Variables privadas
     private Vector3 posicionInicialLocal;
-    private bool presionando = false;
-    private bool enCooldown = false;
+    private bool enProceso = false;
+    private bool estadoInicialLuz = false;
     #endregion
 
     #region Unity Methods
@@ -31,22 +41,37 @@ public class BotonFisicoDebug : MonoBehaviour
         {
             posicionInicialLocal = botonVisual.localPosition;
         }
+
+        if (luzFeedback != null)
+        {
+            estadoInicialLuz = luzFeedback.enabled;
+
+            if (apagarLuzAlIniciar)
+            {
+                luzFeedback.enabled = false;
+            }
+        }
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (botonVisual == null)
+        if (!other.CompareTag(tagActivador))
         {
-            Debug.LogWarning("No se asigno el botonVisual en " + gameObject.name);
             return;
         }
 
-        if (presionando || enCooldown)
+        if (enProceso)
         {
             return;
         }
 
         Debug.Log(mensajeDebug);
+
+        if (alPulsar != null)
+        {
+            alPulsar.Invoke();
+        }
+
         StartCoroutine(AnimarPulsacion());
     }
     #endregion
@@ -54,24 +79,22 @@ public class BotonFisicoDebug : MonoBehaviour
     #region Animacion
     private IEnumerator AnimarPulsacion()
     {
-        presionando = true;
-        enCooldown = true;
+        enProceso = true;
+
+        if (luzFeedback != null)
+        {
+            StartCoroutine(ActivarLuzTemporal());
+        }
 
         Vector3 posicionPresionada = posicionInicialLocal + direccionPresionado;
 
         yield return MoverBoton(posicionInicialLocal, posicionPresionada, duracionPresionado);
-
         yield return new WaitForSeconds(tiempoAntesDeRegresar);
-
         yield return MoverBoton(posicionPresionada, posicionInicialLocal, duracionPresionado);
 
-        presionando = false;
+        yield return new WaitForSeconds(tiempoEntrePulsaciones);
 
-        if (permitirRepetir)
-        {
-            yield return new WaitForSeconds(tiempoEntrePulsaciones);
-            enCooldown = false;
-        }
+        enProceso = false;
     }
 
     private IEnumerator MoverBoton(Vector3 desde, Vector3 hasta, float duracion)
@@ -89,6 +112,22 @@ public class BotonFisicoDebug : MonoBehaviour
         }
 
         botonVisual.localPosition = hasta;
+    }
+
+    private IEnumerator ActivarLuzTemporal()
+    {
+        luzFeedback.enabled = true;
+
+        yield return new WaitForSeconds(tiempoLuzEncendida);
+
+        if (apagarLuzAlIniciar)
+        {
+            luzFeedback.enabled = false;
+        }
+        else
+        {
+            luzFeedback.enabled = estadoInicialLuz;
+        }
     }
     #endregion
 }
